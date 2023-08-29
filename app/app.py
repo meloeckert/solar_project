@@ -1,6 +1,4 @@
 import streamlit as st
-import numpy as np
-import pandas as pd
 
 st.header("Solar panel condition classifier")
 st.text("""Upload an image to evaluate the condition of solar panels.""")
