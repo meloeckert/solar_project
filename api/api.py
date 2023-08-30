@@ -96,7 +96,7 @@ def process_filepath(filepath):
         }
 
 
-@app.get("/predict")
+@app.post("/predict")
 def predict(image_path):
     """
     Predict presence of damage and damage class based on image
@@ -112,14 +112,6 @@ def predict(image_path):
     return f"Predictive wizardry for {image_path} coming soon..."
 
     #
-
-
-
-
-
-
-
-
 
 
 @app.get("/")
