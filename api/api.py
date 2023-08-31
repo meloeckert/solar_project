@@ -38,7 +38,6 @@ def root():
 }
     return res
 
-
 def preprocess(images : dict):
     """
     Predict presence of damage and damage class based on image
@@ -47,7 +46,6 @@ def preprocess(images : dict):
     tile_arrays=[]
     tensors=[]
     invalid={}
-
 
     for f in filenames:
 
