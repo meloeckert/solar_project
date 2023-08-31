@@ -1,13 +1,11 @@
 #pip install tensorflow
 #pip install OpenCV
 
-#import bytesIO
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import os
 import requests
-import io
+from io import BytesIO
 import json
 
 from tensorflow.keras.utils import img_to_array
@@ -16,7 +14,6 @@ from tensorflow.keras.models import load_model
 
 app = FastAPI()
 
-# Allowing all middleware is optional, but good practice for dev purposes
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins
@@ -53,7 +50,6 @@ def preprocess(images : dict):
 
 
     for f in filenames:
-        #TODO: load image from bytes
 
         img = images.get(f'{f}')
         img = Image.open(io.BytesIO(img))
@@ -93,20 +89,17 @@ def find_index_of_max_element(input_list):
 def predict_1(preprocessed_X : dict):
 
     res = {}
-
-    preds = model.predict(preprocessed_X['tensors'])
-
-    print(f"Probabilities: ")
     names_of_classes = ['clean','damaged','dirty']
-    print(f"{names_of_classes}")
-    print(f"{preds[0]}")
-    print(f"Result: {names_of_classes[find_index_of_max_element(preds[0].tolist())]}")
 
-    filename = preprocessed_X['filenames'][0]
-    res[f'{filename}'] = names_of_classes[find_index_of_max_element(preds[0].tolist())]
+    for x in range(len(preprocessed_X['tensors'])):
+        preds = model.predict(preprocessed_X['tensors'][x])
+
+        filename = preprocessed_X['filenames'][x]
+        res[f'{filename}'] = names_of_classes[find_index_of_max_element(preds[0].tolist())]
 
     #if output != "dirt":
      #   predict_2
+    #res = filename:dirty
 
     res_json = json.dumps(res)
     return res_json
