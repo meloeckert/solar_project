@@ -3,8 +3,7 @@ from tensorflow.keras.models import Model, load_model
 import glob
 import os
 
-def load_model() -> Model:
-
+def load_cnn_model() -> Model:
     if MODEL_TARGET == "local":
 
         # Get the latest model version name by the timestamp on disk
