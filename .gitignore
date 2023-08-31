@@ -24,5 +24,11 @@ TestResults.xml
 
 .streamlit/
 raw_data/
-DS_Store
+.DS_Store
 .python-version
+
+*checkpoint.ipynb
+*.ipynb_checkpoints
+*PKG-INFO
+*.egg-info
+__pycache__
