@@ -1,15 +1,18 @@
-import pandas as pd
-import numpy as np
+#pip install tensorflow
+#pip install OpenCV
 
-import requests
+#import bytesIO
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from PIL import Image
 import os
+import requests
+import io
+import json
 
-#from solar_project.preprocessor import preprocess_features
-#from solar_project.ml_logic.registry import load_model
+from tensorflow.keras.utils import img_to_array
+from PIL import Image
+from tensorflow.keras.models import load_model
 
 app = FastAPI()
 
@@ -22,97 +25,14 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-#app.state.model = load_model()
-
-def convert_to_jpeg(filepath):
-        #Load image
-        img= Image.open(filepath)
-
-        # Convert the image to RGB mode
-        img = img.convert("RGB")
-
-        # Save the image in JPEG format as <original filepath>.jpeg to the "jpeg_tmp" folder
-        name = os.path.basename(filepath).replace("jpg", "jpeg")
-        new_filepath = os.path.join(os.getcwd(), "jpeg_tmp", name)
-        img.save(new_filepath, "JPEG")
-
-        # Close the image to free resources
-        img.close()
-
-        return new_filepath
-
-def file_to_arrays_list(filepath):
-        '''Converts JPEG files to arrays and appends arrays & filenames to 'arrays' & 'filenames' lists
-        Appends filenames of unprocessible files to 'invalid' list'''
-
-        image= Image.open(filepath)
-        image_array=np.array(image)
-        arrays.append(image_array)
-        return arrays
-
-def process_filepath(filepath):
-    filepaths = []
-    arrays=[]
-    invalid = []
-
-    #Gets file paths for input files
-    for root, dirs, files in os.walk(image_path):
-        for file in files:
-            filepath = os.path.join(root, file)
-            #Ignores macOS hidden system file in directories
-            if filepath.lower().endswith(".ds_store"):
-                continue
-
-            try:
-                #Converts JPEG files to arrays and add filepath to 'filepaths' list
-                if file.lower().endswith(".jpeg"):
-                    file_to_arrays_list(filepath)
-                    filepaths.append(filepath)
-
-                #Processes non-JPEG image files, converts to arrays and adds original image filepath to 'filepaths' list
-                else:
-                    #Creates jpeg_tmp for converted images if not already created
-                    if not os.path.exists(os.path.join(os.getcwd(), "jpeg_tmp")):
-                            os.makedirs(os.path.join(os.getcwd(), "jpeg_tmp"))
-
-                    #Save JPEG to jpeg_tmp with original filepath as name
-                    original_filepath=filepath
-                    filepath = convert_to_jpeg(filepath)
-
-                    #Converts JPEGs to arrays and adds original image filepath to 'filepaths' list
-                    file_to_arrays_list(filepath)
-                    filepaths.append(original_filepath)
-                    os.remove(filepath)
-
-            except Exception as e:
-                    print("Error processing:", filepath)
-                    print("Error:", e)
-                    invalid.append(filepath)
-
-    return {
-        'array_filepaths':filepaths,
-        'arrays': arrays,
-        'invalid_filepaths': invalid
-        }
-
+#LOAD FROM LOCAL
+app.state.model = load_model('/Users/leila/code/meloeckert/solar_project/model_multiclass_clean_damage_dirt.h5')
 
 @app.post("/predict")
-def predict(image_path : dict of bytes):
-    """
-    Predict presence of damage and damage class based on image
-    """
-    predictions=[]
-
-    arrays = process_filepath(image_path)['arrays']
-    for a in arrays:
-        pred = model.predict(a)
-        predictions.append(pred)
-    #filepath/predictions zip
-
-    return f"Predictive wizardry for {image_path} coming soon..."
-
-    #
-
+def predict(image_as_bytes):
+    preprocessed_X = preprocess(image_as_bytes)
+    res = predict_1(preprocessed_X)
+    return res
 
 @app.get("/")
 def root():
@@ -120,3 +40,77 @@ def root():
     'greeting': 'Hello'
 }
     return res
+
+
+def preprocess(images : dict):
+    """
+    Predict presence of damage and damage class based on image
+    """
+    filenames=list(images.keys())
+    tile_arrays=[]
+    tensors=[]
+    invalid={}
+
+
+    for f in filenames:
+        #TODO: load image from bytes
+        #prediction_image = images.get(f'{f}')#.read()
+        #prediction_image_bytes = images.get(f'{f}')
+            #img = Image.open(io.BytesIO(prediction_image_bytes))
+        try:
+            img=images.get(f'{f}')
+
+        #May be useful for bytes loading
+        #img = cv2.imread(images.get(f'{f}'))
+
+        #TODO image tiling
+        #img_675 = img.resize((675,675))
+        #tile_arrays.append(image_to_array for i in (make_tile(img)))
+
+            img_225 = img.resize((225,225))
+            img_255_array = np.array(img_225)
+            tensor = img_to_array(img_225).reshape((-1, 225, 225, 3))
+            tensors.append(tensor)
+
+        except Exception as e:
+            if f.lower().endswith("ds._store"):
+                continue
+            else:
+                print("Error processing: ", f)
+                print("Error: ", e)
+                invalid[f]= e
+                continue
+
+    preprocessed_X = {"filenames":filenames,
+                     "tensors":tensors,
+                     "tile_arrays":tile_arrays,
+                      "invalid":invalid
+                     }
+
+    return preprocessed_X
+
+def find_index_of_max_element(input_list):
+    max_value = max(input_list)
+    max_index = input_list.index(max_value)
+    return max_index
+
+def predict_1(preprocessed_X : dict):
+
+    res = {}
+
+    preds = model.predict(preprocessed_X['tensors'])
+
+    print(f"Probabilities: ")
+    names_of_classes = ['clean','damaged','dirty']
+    print(f"{names_of_classes}")
+    print(f"{preds[0]}")
+    print(f"Result: {names_of_classes[find_index_of_max_element(preds[0].tolist())]}")
+
+    filename = preprocessed_X['filenames'][0]
+    res[f'{filename}'] = names_of_classes[find_index_of_max_element(preds[0].tolist())]
+
+    #if output != "dirt":
+     #   predict_2
+
+    res_json = json.dumps(res)
+    return res_json
