@@ -54,21 +54,17 @@ def preprocess(images : dict):
 
     for f in filenames:
         #TODO: load image from bytes
-        #prediction_image = images.get(f'{f}')#.read()
-        #prediction_image_bytes = images.get(f'{f}')
-            #img = Image.open(io.BytesIO(prediction_image_bytes))
-        try:
-            img=images.get(f'{f}')
 
-        #May be useful for bytes loading
-        #img = cv2.imread(images.get(f'{f}'))
+        img = images.get(f'{f}')
+        img = Image.open(io.BytesIO(img))
+
+        try:
 
         #TODO image tiling
         #img_675 = img.resize((675,675))
         #tile_arrays.append(image_to_array for i in (make_tile(img)))
 
             img_225 = img.resize((225,225))
-            img_255_array = np.array(img_225)
             tensor = img_to_array(img_225).reshape((-1, 225, 225, 3))
             tensors.append(tensor)
 
