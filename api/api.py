@@ -97,7 +97,7 @@ def process_filepath(filepath):
 
 
 @app.post("/predict")
-def predict(image_path):
+def predict(image_path : dict of bytes):
     """
     Predict presence of damage and damage class based on image
     """
