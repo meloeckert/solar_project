@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := default
 #################### PACKAGE ACTIONS ###################
 reinstall_package:
-	@pip uninstall -y taxifare || :
+	@pip uninstall -y api || :
 	@pip install -e .
 run_api:
 	uvicorn api.api:app --reload
