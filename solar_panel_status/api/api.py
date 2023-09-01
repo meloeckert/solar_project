@@ -32,9 +32,9 @@ app.state.model_1 = load_cnn_model()
 def predict(image: bytes=File(...)):
     preprocessed_X = preprocess(BytesIO(image))
     res = app.state.model_1.predict(preprocessed_X)
-    names_of_classes = ['clean', 'damaged','dirt']
+    names_of_classes = ['clean','damaged','dirt']
 
-    return {'predition': names_of_classes[find_index_of_max_element(res[0].tolist())] }
+    return {'prediction': names_of_classes[find_index_of_max_element(res[0].tolist())] }
 
 
 @app.get("/")
