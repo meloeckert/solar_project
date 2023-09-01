@@ -1,22 +1,20 @@
 #pip install tensorflow
 #pip install OpenCV
 
-#import bytesIO
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import os
 import requests
-import io
+from io import BytesIO
 import json
 
-from tensorflow.keras.utils import img_to_array
+
+import numpy as np
 from PIL import Image
-from tensorflow.keras.models import load_model
+from keras.models import load_model
 
 app = FastAPI()
 
-# Allowing all middleware is optional, but good practice for dev purposes
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins
@@ -26,7 +24,8 @@ app.add_middleware(
 )
 
 #LOAD FROM LOCAL
-app.state.model = load_model('/Users/leila/code/meloeckert/solar_project/model_multiclass_clean_damage_dirt.h5')
+app.state.model_1 = load_model('/Users/leila/code/meloeckert/solar_project/model_multiclass_clean_damage_dirt.h5')
+app.state.model_2 = load_model('/Users/leila/code/meloeckert/solar_project/model_multiclass_clean_damage_dirt.h5')
 
 @app.post("/predict")
 def predict(image_as_bytes):
@@ -41,8 +40,7 @@ def root():
 }
     return res
 
-
-def preprocess(images : dict):
+def preprocess(images : dict, num_tiles=3):
     """
     Predict presence of damage and damage class based on image
     """
@@ -51,25 +49,29 @@ def preprocess(images : dict):
     tensors=[]
     invalid={}
 
-
     for f in filenames:
-        #TODO: load image from bytes
-        #prediction_image = images.get(f'{f}')#.read()
-        #prediction_image_bytes = images.get(f'{f}')
-            #img = Image.open(io.BytesIO(prediction_image_bytes))
+
+        img = images.get(f'{f}')
+        img = Image.open(BytesIO(img))
+
         try:
-            img=images.get(f'{f}')
 
-        #May be useful for bytes loading
-        #img = cv2.imread(images.get(f'{f}'))
+            #image tiling, array conversion; append to 'image_tiles' list
+            image_tiles = []
+            img_675_array = np.array(img.resize((675,675)))
 
-        #TODO image tiling
-        #img_675 = img.resize((675,675))
-        #tile_arrays.append(image_to_array for i in (make_tile(img)))
+            #vertical slice; num_tiles = # of equal divisions
+            for v in range(0,img_675_array.shape[0],img_675_array.shape[0]//num_tiles):
+                #horizontal slice; num_tiles = # of equal divisions
+                for h in range(0,img_675_array.shape[1],img_675_array.shape[1]//num_tiles):
+                    tile_array = img_675_array[v:v+(img_675_array.shape[0]//num_tiles), h:h+(img_675_array.shape[1]//num_tiles),:]
+                    image_tiles.append(tile_array)
 
-            img_225 = img.resize((225,225))
-            img_255_array = np.array(img_225)
-            tensor = img_to_array(img_225).reshape((-1, 225, 225, 3))
+            tile_arrays.append(image_tiles)
+
+            #resize full image and convert to array; append to 'tensors' list
+            img_255_array = np.array(img.resize((225,225)))
+            tensor = img_255_array.reshape((-1, 225, 225, 3))
             tensors.append(tensor)
 
         except Exception as e:
@@ -94,23 +96,34 @@ def find_index_of_max_element(input_list):
     max_index = input_list.index(max_value)
     return max_index
 
-def predict_1(preprocessed_X : dict):
+def predict(preprocessed_X : dict):
 
-    res = {}
-
-    preds = model.predict(preprocessed_X['tensors'])
-
-    print(f"Probabilities: ")
+    results = {}
     names_of_classes = ['clean','damaged','dirty']
-    print(f"{names_of_classes}")
-    print(f"{preds[0]}")
-    print(f"Result: {names_of_classes[find_index_of_max_element(preds[0].tolist())]}")
 
-    filename = preprocessed_X['filenames'][0]
-    res[f'{filename}'] = names_of_classes[find_index_of_max_element(preds[0].tolist())]
+    for x in range(len(preprocessed_X['tensors'])):
+        preds = model_1.predict(preprocessed_X['tensors'][x])
+        res = names_of_classes[find_index_of_max_element(preds[0].tolist())]
 
-    #if output != "dirt":
-     #   predict_2
+        if res != 'dirty':
+            res = predict_2(preprocessed_X['tile_arrays'][x])
 
-    res_json = json.dumps(res)
-    return res_json
+        filename = preprocessed_X['filenames'][x]
+        res[f'{filename}'] = res
+
+    results_json = json.dumps(results)
+    return results_json
+
+def predict_2(tile_arrays : dict):
+    results = {}
+
+    for t in tile_arrays:
+        preds = model_2.predict(t)
+        res = names_of_classes[find_index_of_max_element(preds[0].tolist())]
+        results.append(res)
+
+    #some logic to derive single result from tile results
+    #if using pred probabilities, amend for-loop to append preds somewhere
+
+    res = "tbd"
+    return res
