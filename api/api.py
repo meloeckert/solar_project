@@ -24,8 +24,8 @@ app.add_middleware(
 )
 
 #LOAD FROM LOCAL
-app.state.model_1 = load_model('/Users/leila/code/meloeckert/solar_project/model_multiclass_clean_damage_dirt.h5')
-app.state.model_2 = load_model('/Users/leila/code/meloeckert/solar_project/model_multiclass_clean_damage_dirt.h5')
+app.state.model_1 = load_model('solar_project/model_multiclass_clean_damage_dirt.h5')
+app.state.model_2 = load_model('solar_project/model_multiclass_clean_damage_dirt.h5')
 
 @app.post("/predict")
 def predict(image_as_bytes):
