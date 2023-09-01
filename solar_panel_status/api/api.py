@@ -24,19 +24,19 @@ app.add_middleware(
 )
 
 #LOAD FROM LOCAL
-app.state.model_1 = load_model('solar_project/model_multiclass_clean_damage_dirt.h5')
-app.state.model_2 = load_model('solar_project/model_multiclass_clean_damage_dirt.h5')
+app.state.model_1 = load_model('models/model_v4.h5')
+#app.state.model_2 = load_model('solar_project/model_multiclass_clean_damage_dirt.h5')
 
 @app.post("/predict")
 def predict(image_as_bytes):
     preprocessed_X = preprocess(image_as_bytes)
-    res = predict_1(preprocessed_X)
+    res = predict(preprocessed_X)
     return res
 
 @app.get("/")
 def root():
     res = {
-    'greeting': 'Hello'
+    'greeting': 'solar project root is up'
 }
     return res
 
@@ -96,7 +96,7 @@ def find_index_of_max_element(input_list):
     max_index = input_list.index(max_value)
     return max_index
 
-def predict(preprocessed_X : dict):
+def predict(model_1, preprocessed_X : dict):
 
     results = {}
     names_of_classes = ['clean','damaged','dirty']
@@ -105,8 +105,8 @@ def predict(preprocessed_X : dict):
         preds = model_1.predict(preprocessed_X['tensors'][x])
         res = names_of_classes[find_index_of_max_element(preds[0].tolist())]
 
-        if res != 'dirty':
-            res = predict_2(preprocessed_X['tile_arrays'][x])
+        # if res != 'dirty':
+        #     res = predict_2(preprocessed_X['tile_arrays'][x])
 
         filename = preprocessed_X['filenames'][x]
         res[f'{filename}'] = res
@@ -114,16 +114,16 @@ def predict(preprocessed_X : dict):
     results_json = json.dumps(results)
     return results_json
 
-def predict_2(tile_arrays : dict):
-    results = {}
+# def predict_2(model_2, tile_arrays : dict):
+#     results = {}
 
-    for t in tile_arrays:
-        preds = model_2.predict(t)
-        res = names_of_classes[find_index_of_max_element(preds[0].tolist())]
-        results.append(res)
+#     for t in tile_arrays:
+#         preds = model_2.predict(t)
+#         res = names_of_classes[find_index_of_max_element(preds[0].tolist())]
+#         results.append(res)
 
-    #some logic to derive single result from tile results
-    #if using pred probabilities, amend for-loop to append preds somewhere
+#     #some logic to derive single result from tile results
+#     #if using pred probabilities, amend for-loop to append preds somewhere
 
-    res = "tbd"
-    return res
+#     res = "tbd"
+#     return res
