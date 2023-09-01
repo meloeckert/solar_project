@@ -3,19 +3,17 @@ from tensorflow.keras.models import Model, load_model
 import glob
 import os
 
-def load_cnn_model() -> Model:
+def load_cnn_model(MODEL_TARGET='local') -> Model:
     if MODEL_TARGET == "local":
-
+        current_dir = os.path.dirname(os.path.abspath(__file__))
         # Get the latest model version name by the timestamp on disk
-        local_model_directory = LOCAL_REGISTRY_PATH
-        local_model_paths = glob.glob(f"{local_model_directory}/*")
+        local_model_path = os.path.join(current_dir,'..','models','model_v4.h5')
 
-        if not local_model_paths:
+        if not local_model_path:
             return None
 
-        most_recent_model_path_on_disk = sorted(local_model_paths)[-1]
 
-        latest_model = load_model(most_recent_model_path_on_disk)
+        latest_model = load_model(local_model_path)
 
         print("Model loaded from local disk")
 

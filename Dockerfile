@@ -5,8 +5,8 @@ WORKDIR /prod
 COPY requirements_prod.txt requirements.txt
 RUN pip install -r requirements.txt
 
-# Then only, install taxifare!
-COPY api api
+# Then only, install solar_panel_status!
+COPY solar_panel_status solar_panel_status
 COPY setup.py setup.py
 RUN pip install .
 
@@ -16,4 +16,4 @@ RUN make reset_local_files
 
 #CMD uvicorn taxifare.api.fast:app --host 0.0.0.0
 
-CMD uvicorn api.api:app --host 0.0.0.0 --port $PORT
+CMD uvicorn solar_panel_status.api.api:app --host 0.0.0.0 --port $PORT
