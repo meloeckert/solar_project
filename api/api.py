@@ -15,7 +15,6 @@ from keras.models import load_model
 
 app = FastAPI()
 
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins

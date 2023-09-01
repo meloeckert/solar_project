@@ -31,4 +31,4 @@ raw_data/
 *.ipynb_checkpoints
 *PKG-INFO
 *.egg-info
-__pycache__
+*__pycache__
