@@ -6,7 +6,7 @@ COPY requirements_prod.txt requirements.txt
 RUN pip install -r requirements.txt
 
 # Then only, install taxifare!
-COPY taxifare taxifare
+COPY api api
 COPY setup.py setup.py
 RUN pip install .
 
@@ -16,4 +16,4 @@ RUN make reset_local_files
 
 #CMD uvicorn taxifare.api.fast:app --host 0.0.0.0
 
-CMD uvicorn taxifare.api.fast:app --host 0.0.0.0 --port $PORT
+CMD uvicorn api.api:app --host 0.0.0.0 --port $PORT
