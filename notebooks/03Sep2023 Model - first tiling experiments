@@ -1,0 +1,438 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "f7cd9069-bb6b-4d08-a036-d4f8191da52b",
+   "metadata": {},
+   "source": [
+    "# Experiment: Model with 9 tiles & 3 classes (clean, damaged, dirt)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "4a4be516-11b3-4b63-838a-716ebd808de3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from tensorflow.keras.preprocessing.image import array_to_img, img_to_array, load_img\n",
+    "from tensorflow.keras.utils import image_dataset_from_directory\n",
+    "from tensorflow.keras.models import Sequential, Model\n",
+    "from tensorflow.keras import layers, optimizers, callbacks\n",
+    "from keras.saving import load_model \n",
+    "import matplotlib.pyplot as plt \n",
+    "from tensorflow.keras.losses import SparseCategoricalCrossentropy\n",
+    "#from tensorflow.math import confusion_matrix\n",
+    "from sklearn.metrics import confusion_matrix\n",
+    "from sklearn.metrics import f1_score\n",
+    "from PIL import Image\n",
+    "import numpy as np\n",
+    "from statistics import multimode\n",
+    "import os\n",
+    "\n",
+    "%matplotlib inline"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "0698ec8f-fa0e-4668-bd11-379dab12b42f",
+   "metadata": {},
+   "source": [
+    "## Load data and model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "8335750d-aaa5-43d5-bdf4-fb1c9d6cafd0",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "model_path = os.path.join(os.getcwd(), '../solar_panel_status/models/model_v4.h5')\n",
+    "model = load_model(os.path.abspath(model_path))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "57c9c3f3-472b-45d9-8edc-12fa7b3f6468",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Found 90 files belonging to 3 classes.\n",
+      "Found 90 files belonging to 3 classes.\n"
+     ]
+    }
+   ],
+   "source": [
+    "batch_size = 32\n",
+    "test_data_dir = '/Users/leila/code/meloeckert/solar_project/api/raw_data/exp2-val-data-balanced/'\n",
+    "\n",
+    "val_data = image_dataset_from_directory(\n",
+    "   test_data_dir,\n",
+    "   #labels = \"inferred\",\n",
+    "   label_mode = \"int\",\n",
+    "   seed=123,\n",
+    "   image_size=(675, 675),\n",
+    "   batch_size=batch_size,\n",
+    " )\n",
+    "\n",
+    "val_data_225 = image_dataset_from_directory(\n",
+    "   test_data_dir,\n",
+    "   #labels = \"inferred\",\n",
+    "   label_mode = \"int\",\n",
+    "   seed=123,\n",
+    "   image_size=(225, 225),\n",
+    "   batch_size=batch_size,\n",
+    " )\n",
+    "\n",
+    "names_of_classes = val_data.class_names"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "4f97cea0-a317-44e9-a7f6-680a3782fa92",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#Images of size 675x675 for tiling\n",
+    "\n",
+    "val_data_for_prep = val_data.unbatch()\n",
+    "images = list(val_data_for_prep.map(lambda x, y: x))\n",
+    "labels = np.array(list(val_data_for_prep.map(lambda x, y: y)))\n",
+    "\n",
+    "#Images of size 225x225 for processing as single image\n",
+    "\n",
+    "val_data_225_for_prep = val_data_225.unbatch()\n",
+    "images_225 = list(val_data_225_for_prep.map(lambda x, y: x))\n",
+    "labels_225 = np.array(list(val_data_225_for_prep.map(lambda x, y: y)))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "95dfc800-d335-4c0b-a084-7a0a3f61eb3a",
+   "metadata": {},
+   "source": [
+    " ## Preprocessing"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "8b99b0db-4cc9-45cb-a5f9-b45ff7653b4d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def preprocess_images(images):\n",
+    "    X_full_image_preprocessed = []\n",
+    "\n",
+    "    for i in images:\n",
+    "        i= np.array(i).reshape((-1, 225, 225, 3))\n",
+    "        X_full_image_preprocessed.append(i)\n",
+    "    return X_full_image_preprocessed  \n",
+    "\n",
+    "def preprocess_tiles(images : dict, num_tiles=3):\n",
+    "    \"\"\"\n",
+    "    Predict presence of damage and damage class based on image\n",
+    "    \"\"\"\n",
+    "    tile_tensors=[]\n",
+    "    invalid={}\n",
+    "\n",
+    "    for f in images:\n",
+    "\n",
+    "        try:\n",
+    "\n",
+    "            #image tiling, tensor conversion; append to 'image_tiles' list\n",
+    "            image_tiles = []\n",
+    "            img_675_array =np.array(f)\n",
+    "            #vertical slice; num_tiles = # of equal divisions\n",
+    "            for v in range(0,img_675_array.shape[0],img_675_array.shape[0]//num_tiles):\n",
+    "                #horizontal slice; num_tiles = # of equal divisions\n",
+    "                for h in range(0,img_675_array.shape[1],img_675_array.shape[1]//num_tiles):\n",
+    "                    tile_array = img_675_array[v:v+(img_675_array.shape[0]//num_tiles), h:h+(img_675_array.shape[1]//num_tiles),:]\n",
+    "                    tensor = tile_array.reshape((-1, 225, 225, 3))\n",
+    "                    image_tiles.append(tensor)\n",
+    "\n",
+    "            tile_tensors.append(image_tiles)\n",
+    "\n",
+    "        except Exception as e:\n",
+    "            if f.lower().endswith(\"ds._store\"):\n",
+    "                continue\n",
+    "            else:\n",
+    "                print(\"Error processing: \", f)\n",
+    "                print(\"Error: \", e)\n",
+    "                invalid[f]= e\n",
+    "                continue\n",
+    "\n",
+    "    preprocessed_X = {\n",
+    "                     \"tile_tensors\":tile_tensors,\n",
+    "                      \"invalid\":invalid\n",
+    "                     }\n",
+    "\n",
+    "    return preprocessed_X"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "acca4a0b-935c-4877-862a-fe908a6971ee",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "X_tiles_preprocessed = preprocess_tiles(images)\n",
+    "X_full_image_preprocessed = preprocess_images(images_225)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1119a7d5-ee8c-47f2-aa30-04d2b6c2a5eb",
+   "metadata": {},
+   "source": [
+    "## Prediction and helper functions"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "id": "bbd6d86c-bad2-4cf4-8f3b-94ee50cdbd82",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def predict(model_2, tile_tensors : dict):\n",
+    "    results = []\n",
+    "    classes = [0,1,2]\n",
+    "    for t in tile_tensors: \n",
+    "        preds = model.predict(t)\n",
+    "        res = find_index_of_max_element(preds[0].tolist())\n",
+    "        res_name = names_of_classes[find_index_of_max_element(preds[0].tolist())]\n",
+    "        results.append(classes[res])\n",
+    "     \n",
+    "    return results\n",
+    "\n",
+    "\n",
+    "def predict_2(model_2, tile_tensors : dict):\n",
+    "    results = []\n",
+    "    classes = [0,1,2]\n",
+    "    for i in tile_tensors:\n",
+    "        image_results=[]\n",
+    "        for t in range(len(i)): \n",
+    "            preds = model.predict(i[t])\n",
+    "            res = find_index_of_max_element(preds[0].tolist())\n",
+    "            res_names = names_of_classes[find_index_of_max_element(preds[0].tolist())]\n",
+    "            image_results.append(res)\n",
+    "        results.append(image_results)\n",
+    "     \n",
+    "    return results"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "c0717b54-8d76-4463-95ed-1c481a88e696",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def find_index_of_max_element(input_list):\n",
+    "    max_value = max(input_list)\n",
+    "    max_index = input_list.index(max_value)\n",
+    "    return max_index"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "87496fae-e7f8-4deb-9ded-01b044faa092",
+   "metadata": {},
+   "source": [
+    "## Predictions"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "id": "ebc23934-8214-4453-99fa-ccfac024bae0",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%%capture\n",
+    "#Preds for full images\n",
+    "preds_full = predict(model, X_full_image_preprocessed)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "id": "3f184b2b-95f2-4855-82b0-f6971502b64f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%%capture\n",
+    "#Preds for tiles\n",
+    "preds = predict_2(model, X_tiles_preprocessed['tile_tensors'])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 50,
+   "id": "e684224a-280f-4b50-a743-b83133ac876c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%%capture\n",
+    "results_image=[]\n",
+    "for i in preds:\n",
+    "    results_image.append(int(max(multimode(i))))\n",
+    "#results_image = int(results_image)\n",
+    "results_image"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 51,
+   "id": "3cc66166-5c50-4d7f-a546-55184de0b6ca",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "int"
+      ]
+     },
+     "execution_count": 51,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "type(results_image[0])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2652258c-ebe6-48e6-86fe-a29b4650f511",
+   "metadata": {},
+   "source": [
+    "### Baseline (model = model_v4)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 54,
+   "id": "565ac8c4-b3b1-4ff4-9eea-41cdcfe3cd48",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%%capture\n",
+    "names_of_classes\n",
+    "confusion_matrix(labels_225, preds_full)\n",
+    "f1_score(labels_225, preds_full, average=None)\n",
+    "\n",
+    "#['clean', 'damage', 'dirt']\n",
+    "#[[13  8  9]\n",
+    "# [13  7 10]\n",
+    "# [12  8 10]]\n",
+    "#f1=[0.38235294 0.26415094 0.33898305]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "bbec5378-bf77-4bdf-a8d4-2daf06dbd9c9",
+   "metadata": {},
+   "source": [
+    "#### Tiles"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 55,
+   "id": "b2144e08-3738-4198-8037-ac725904e468",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%%capture\n",
+    "names_of_classes\n",
+    "print(confusion_matrix(labels, results_image))\n",
+    "f1_score(labels_225, results_image, average=None)\n",
+    "\n",
+    "#['clean', 'damage', 'dirt']\n",
+    "#[[ 4 13 13]\n",
+    "# [ 4 14 12]\n",
+    "# [ 4 13 13]]\n",
+    "#f1=[0.19047619, 0.4       , 0.38235294] \n",
+    "#f1 v baseline = -0.9, +0.14, +0.05"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "id": "1c3db83a-b6f2-420b-a726-63a054c8ce81",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[[12 17  9]\n",
+      " [ 0 20  3]\n",
+      " [ 0  3 26]]\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "array([0.48      , 0.63492063, 0.7761194 ])"
+      ]
+     },
+     "execution_count": 56,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "#%%capture\n",
+    "names_of_classes\n",
+    "print(confusion_matrix(preds_full, results_image))\n",
+    "f1_score(preds_full, results_image, average=None)\n",
+    "\n",
+    "#['clean', 'damage', 'dirt']\n",
+    "#[[ 4 13 13]\n",
+    "# [ 4 14 12]\n",
+    "# [ 4 13 13]]\n",
+    "#f1=[0.19047619, 0.4       , 0.38235294] \n",
+    "#f1 v baseline = -0.9, +0.14, +0.05"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ed7be702-0dcc-4214-95f1-b0fd83c30f0e",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
