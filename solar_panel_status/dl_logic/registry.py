@@ -1,6 +1,6 @@
-from params import *
+#from params import *
 from tensorflow.keras.models import Model, load_model
-import glob
+#import glob
 import os
 
 def load_cnn_model(MODEL_TARGET='local') -> Model:

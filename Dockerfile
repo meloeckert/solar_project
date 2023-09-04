@@ -11,8 +11,8 @@ COPY setup.py setup.py
 RUN pip install .
 
 # We already have a make command for that!
-COPY Makefile Makefile
-RUN make reset_local_files
+#COPY Makefile Makefile
+#RUN make reset_local_files
 
 #CMD uvicorn taxifare.api.fast:app --host 0.0.0.0
 
