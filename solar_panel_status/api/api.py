@@ -32,7 +32,7 @@ app.state.model_1 = load_cnn_model()
 def predict(image: bytes=File(...)):
     preprocessed_X = preprocess(BytesIO(image))
     res = app.state.model_1.predict(preprocessed_X)
-    names_of_classes = ['clean','damaged','dirt']
+    names_of_classes = ['clean','damaged','dirty']
 
     return {'prediction': names_of_classes[find_index_of_max_element(res[0].tolist())] }
 
@@ -68,17 +68,3 @@ def predict(model_1, preprocessed_X : dict):
 
     results_json = json.dumps(results)
     return results_json
-
-# def predict_2(model_2, tile_arrays : dict):
-#     results = {}
-
-#     for t in tile_arrays:
-#         preds = model_2.predict(t)
-#         res = names_of_classes[find_index_of_max_element(preds[0].tolist())]
-#         results.append(res)
-
-#     #some logic to derive single result from tile results
-#     #if using pred probabilities, amend for-loop to append preds somewhere
-
-#     res = "tbd"
-#     return res
